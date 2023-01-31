@@ -10,7 +10,7 @@ from trainer.config import *
 from trainer.dataloader import *
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
-from model.u2net import *
+from trainer.model.u2net import *
 
 # Arguments
 parser = argparse.ArgumentParser(description='U^2-NET Training')

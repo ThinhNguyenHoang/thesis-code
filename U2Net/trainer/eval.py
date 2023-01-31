@@ -7,7 +7,7 @@ import argparse
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
 
-from model.u2net import *
+from trainer.model.u2net import *
 from trainer.config import *
 from trainer.dataloader import *
 
