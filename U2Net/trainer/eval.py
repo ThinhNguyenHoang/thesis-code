@@ -8,8 +8,8 @@ from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
 
 from model.u2net import *
-from config import *
-from dataloader import *
+from trainer.config import *
+from trainer.dataloader import *
 
 def str2bool(v):
     return v is not None and v.lower() in ("yes", "true", "t", "1")

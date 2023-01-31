@@ -6,8 +6,8 @@ import argparse
 import pathlib
 import signal
 
-from config import *
-from dataloader import *
+from trainer.config import *
+from trainer.dataloader import *
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
 from model.u2net import *
