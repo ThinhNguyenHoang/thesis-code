@@ -47,18 +47,20 @@ if args.resume:
     resume = args.resume
 
 if args.data_loading_mode:
-    data_loading_mode = args.data_loading_mode
+    data_loading_mode = args.data_loading_mode or DataLoadingMode.FROM_ZIPPED
 
 # Previewing, not necessary
-img = cv2.imread('examples/skateboard.jpg')
-img = cv2.resize(img, dsize=default_in_shape[:2], interpolation=cv2.INTER_CUBIC)
-inp = np.expand_dims(img, axis=0)
+# img = cv2.imread('examples/skateboard.jpg')
+# img = cv2.resize(img, dsize=default_in_shape[:2], interpolation=cv2.INTER_CUBIC)
+# inp = np.expand_dims(img, axis=0)
 
 # Overwrite the default optimizer
 adam = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=.9, beta_2=.999, epsilon=1e-08)
 cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=weights_file, save_weights_only=True, verbose=1)
 
 def train():
+    print('SCRIPT IS STARTED WITH ARGS')
+    print(sys.argv)
     inputs = keras.Input(shape=default_in_shape)
     net = U2NET()
     out = net(inputs)
@@ -76,7 +78,10 @@ def train():
     # helper function to save state of model
     def save_weights():
         print('Saving state of model to %s' % weights_file)
-        model.save_weights(str(weights_file))
+        if BUCKET_NAME and data_loading_mode in [DataLoadingMode.FROM_BUCKET, DataLoadingMode.FROM_FUSE]:
+            model.save_weights(f'{BUCKET_PREFIX}/weights/{weights_file}')
+        else:
+            model.save_weights(str(weights_file))
     
     # signal handler for early abortion to autosave model state
     def autosave(sig, frame):

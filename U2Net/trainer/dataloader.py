@@ -19,7 +19,8 @@ DATASET_MASK_FOLDER_NAME = 'DUTS-TR-Mask'
 
 # VARIABLES FOR TRAINING WITH BUCKETS
 BUCKET_NAME = os.environ.get('BUCKET_NAME')
-DATASET_BUCKET_URI = f'/gcs/{BUCKET_NAME}/datasets/'
+BUCKET_PREFIX = f'/gcs/{BUCKET_NAME}'
+DATASET_BUCKET_URI = f'{BUCKET_PREFIX}/datasets/'
 class DataLoadingMode(Enum):
     FROM_ZIPPED = 1
     FROM_BUCKET = 2
@@ -97,13 +98,12 @@ def load_training_batch(batch_size=12, in_shape=default_in_shape, out_shape=defa
     global cache
     if cache is None:
         cache = os.listdir(image_dir)
-    
+    if image_dir is None or mask_dir is None:
+        raise ValueError('IMAGE and MASK dir cannot be None')
     imgs = random.choices(cache, k=batch_size)
-    image_list = [get_image_mask_pair(img, in_resize=default_in_shape, out_resize=default_out_shape) for img in imgs]
+    image_list = [get_image_mask_pair(img_name=img, image_dir=image_dir, mask_dir=mask_dir, in_resize=default_in_shape, out_resize=default_out_shape) for img in imgs]
     
     tensor_in  = np.stack([i[0]/255. for i in image_list])
     tensor_out = np.stack([i[1]/255. for i in image_list])
     
     return (tensor_in, tensor_out)  
-
-print(f"TEST CONFIG {batch_size}")

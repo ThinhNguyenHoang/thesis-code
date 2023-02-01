@@ -12,5 +12,5 @@ setup(
     install_requires=REQUIRED_PACKAGES,
     packages=find_packages(), # Automatically find packages within this directory or below.
     # include_package_data=True, # if packages include any data files, those will be packed together.
-    description='Classification training titanic survivors prediction model'
+    description='Model for saliency detection   '
 )
