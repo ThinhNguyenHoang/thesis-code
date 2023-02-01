@@ -1,0 +1,10 @@
+workerPoolSpecs:
+  machineSpec:
+    machineType: n1-highmem-2
+  replicaCount: 1
+  containerSpec:
+    imageUri: gcr.io/ucaip-test/ucaip-training-test
+    args:
+    - port=8500
+    command:
+    - start

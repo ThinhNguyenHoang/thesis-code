@@ -18,13 +18,16 @@ DATASET_IMAGE_FOLDER_NAME = 'DUTS-TR-Image'
 DATASET_MASK_FOLDER_NAME = 'DUTS-TR-Mask'
 
 # VARIABLES FOR TRAINING WITH BUCKETS
-BUCKET_NAME = os.environ.get('BUCKET_NAME')
+BUCKET_NAME = os.environ.get('BUCKET_NAME') or 'thesis-data-bucket'
+def get_bucket_prefix(bucket_name=BUCKET_NAME):
+    return f'/gcs/{bucket_name}'
+
 BUCKET_PREFIX = f'/gcs/{BUCKET_NAME}'
 DATASET_BUCKET_URI = f'{BUCKET_PREFIX}/datasets/'
-class DataLoadingMode(Enum):
-    FROM_ZIPPED = 1
-    FROM_BUCKET = 2
-    FROM_FUSE = 3
+
+FROM_ZIPPED = 1
+FROM_BUCKET = 2
+FROM_FUSE = 3
 # aborting wget leaves .tmp files everywhere >:(
 def clean_dataloader():
     for tmp_file in glob.glob('*.tmp'):
@@ -33,6 +36,7 @@ def clean_dataloader():
 def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
     dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
     if dataset_dir.exists():
+        print(f'DATSET ALREADY EXIST: {dataset_dir}')
         return
 
     print('Downloading DUTS-TR Dataset from %s...' % dataset_url)
@@ -46,18 +50,22 @@ def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
 
     clean_dataloader()
 # OUTPUT: (image_dir, output_dir)
-def prepare_data_set(mode=DataLoadingMode.FROM_ZIPPED):
+def prepare_data_set(mode=FROM_ZIPPED):
     # Download and store in 'data'
+    print(f'PREPARING DATASET WITH mode: {mode}')
     root_data_dir = pathlib.Path('data')
     dataset_dir = root_data_dir.joinpath(DATASET_NAME)
-    if mode is DataLoadingMode.FROM_ZIPPED:
+    if mode == FROM_ZIPPED:
+        print(f'DOWLOADING ZIPPED DS: {DATASET_BUCKET_URI}')
         download_duts_tr_dataset(dataset_dir,root_data_dir)
-    elif mode is DataLoadingMode.FROM_BUCKET:
+    elif mode == FROM_BUCKET:
         dataset_url = f'{DATASET_BUCKET_URI}'
+        print(f'DOWNLOADING RAW DS FROM BUCKET: {DATASET_BUCKET_URI}')
         f = wget.download(dataset_url, out=str(root_data_dir.absolute()))
         if not pathlib.Path(f).exists():
             return
-    elif mode is DataLoadingMode.FROM_FUSE:
+    elif mode == FROM_FUSE:
+        print(f'RUNNING WITH FUSE: {DATASET_BUCKET_URI}')
         dataset_dir = pathlib.Path(DATASET_NAME)
 
     image_dir = dataset_dir.joinpath(DATASET_IMAGE_FOLDER_NAME)
