@@ -66,10 +66,17 @@ def prepare_data_set(mode=FROM_ZIPPED):
             return
     elif mode == FROM_FUSE:
         print(f'RUNNING WITH FUSE: {DATASET_BUCKET_URI}')
-        dataset_dir = pathlib.Path(DATASET_NAME)
+        print("WE ARE CURRENTLY AT")
+        print(os.listdir())
+        os.chdir(DATASET_BUCKET_URI)
 
+        print("NOW WE ARE AT:")
+        print(os.listdir())
+        dataset_dir = pathlib.Path(DATASET_NAME)
+        
     image_dir = dataset_dir.joinpath(DATASET_IMAGE_FOLDER_NAME)
     mask_dir = dataset_dir.joinpath(DATASET_MASK_FOLDER_NAME)
+    print(f'RETURNIN (image_dir, mask_dir)=({image_dir},{mask_dir})')
     return (image_dir, mask_dir)
 
 def format_input(input_image):
