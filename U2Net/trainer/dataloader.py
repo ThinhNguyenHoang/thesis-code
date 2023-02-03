@@ -35,6 +35,8 @@ def clean_dataloader():
 
 def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
     dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
+    pathlib.Path(root_data_dir.absolute()).mkdir(exist_ok=True)
+
     if dataset_dir.exists():
         print(f'DATSET ALREADY EXIST: {dataset_dir}')
         return
@@ -106,7 +108,9 @@ def get_image_mask_pair(img_name,  image_dir, mask_dir, in_resize=None, out_resi
     if augment and bool(random.getrandbits(1)):
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-
+    # x (320, 320)
+    # expand_dims(x) => (320, 320, 1)
+    # (320, 320, 3) and (320, 320, 1)
     return (np.asarray(img, dtype=np.float32), np.expand_dims(np.asarray(mask, dtype=np.float32), -1))
 
 def load_training_batch(batch_size=12, in_shape=default_in_shape, out_shape=default_out_shape, image_dir=None, mask_dir=None):
@@ -116,9 +120,11 @@ def load_training_batch(batch_size=12, in_shape=default_in_shape, out_shape=defa
     if image_dir is None or mask_dir is None:
         raise ValueError('IMAGE and MASK dir cannot be None')
     imgs = random.choices(cache, k=batch_size)
+    # [(img, mask)]
     image_list = [get_image_mask_pair(img_name=img, image_dir=image_dir, mask_dir=mask_dir, in_resize=default_in_shape, out_resize=default_out_shape) for img in imgs]
-    
+    # Loop and extract images in batch 
     tensor_in  = np.stack([i[0]/255. for i in image_list])
+    # Loop and extract masks from batch
     tensor_out = np.stack([i[1]/255. for i in image_list])
     
     return (tensor_in, tensor_out)  
