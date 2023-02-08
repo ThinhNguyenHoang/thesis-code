@@ -51,7 +51,7 @@ if args.resume:
     resume = args.resume
 
 if args.data_loading_mode:
-    data_loading_mode = args.data_loading_mode or FROM_ZIPPED
+    data_loading_mode = args.data_loading_mode or LOCAL_TEST
 
 if args.bucket_name:
     BUCKET_NAME = args.bucket_name

@@ -6,6 +6,7 @@ import wget
 import zipfile
 import glob
 import sys
+import shutil
 # sys.path.append('./')
 from enum import Enum
 
@@ -25,6 +26,7 @@ def get_bucket_prefix(bucket_name=BUCKET_NAME):
 BUCKET_PREFIX = f'/gcs/{BUCKET_NAME}'
 DATASET_BUCKET_URI = f'{BUCKET_PREFIX}/datasets/'
 
+LOCAL_TEST = 0
 FROM_ZIPPED = 1
 FROM_BUCKET = 2
 FROM_FUSE = 3
@@ -35,6 +37,7 @@ def clean_dataloader():
 
 def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
     dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
+    shutil.rmtree(root_data_dir.absolute())
     pathlib.Path(root_data_dir.absolute()).mkdir(exist_ok=True)
 
     if dataset_dir.exists():
@@ -57,7 +60,14 @@ def prepare_data_set(mode=FROM_ZIPPED):
     print(f'PREPARING DATASET WITH mode: {mode}')
     root_data_dir = pathlib.Path('data')
     dataset_dir = root_data_dir.joinpath(DATASET_NAME)
-    if mode == FROM_ZIPPED:
+    if mode == LOCAL_TEST:
+        print('TESTING WITH DATA PREPARED LOCALY')
+        root = pathlib.Path('local_tset_data')
+        dataset_dir = root_data_dir.joinpath(DATASET_NAME)
+        image_dir = dataset_dir.joinpath(DATASET_IMAGE_FOLDER_NAME)
+        mask_dir = dataset_dir.joinpath(DATASET_MASK_FOLDER_NAME)
+        return (image_dir, mask_dir)
+    elif mode == FROM_ZIPPED:
         print(f'DOWLOADING ZIPPED DS: {DATASET_BUCKET_URI}')
         download_duts_tr_dataset(dataset_dir,root_data_dir)
     elif mode == FROM_BUCKET:
