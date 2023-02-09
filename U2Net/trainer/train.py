@@ -30,8 +30,6 @@ parser.add_argument('--bucket_name', default=None, type=str,
                     help="Bucket name for loading data and saving model into")
 args = parser.parse_args()
 
-data_loading_mode = 1
-
 if args.batch_size:
     batch_size = args.batch_size
 
@@ -64,6 +62,12 @@ if args.bucket_name:
 # Overwrite the default optimizer
 adam = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=.9, beta_2=.999, epsilon=1e-08)
 cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=weights_file, save_weights_only=True, verbose=1)
+
+
+print("==================== ARGS ========================")
+print(args)
+print(f"loading_mode: (passed, received) ({args.data_loading_mode}, {data_loading_mode})")
+
 
 def train():
     print('SCRIPT IS STARTED WITH ARGS')

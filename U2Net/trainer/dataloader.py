@@ -26,18 +26,25 @@ def get_bucket_prefix(bucket_name=BUCKET_NAME):
 BUCKET_PREFIX = f'/gcs/{BUCKET_NAME}'
 DATASET_BUCKET_URI = f'{BUCKET_PREFIX}/datasets/'
 
-LOCAL_TEST = 0
 FROM_ZIPPED = 1
 FROM_BUCKET = 2
 FROM_FUSE = 3
+LOCAL_TEST = 4
 # aborting wget leaves .tmp files everywhere >:(
 def clean_dataloader():
     for tmp_file in glob.glob('*.tmp'):
         os.remove(tmp_file)
 
+def try_remove_old_data(path_to_delete):
+    try:
+        if os.path.isdir(path_to_delete):
+            shutil.rmtree(path_to_delete)
+    finally:
+        print('end of removing old dataset')
+
 def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
     dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
-    shutil.rmtree(root_data_dir.absolute())
+    try_remove_old_data(root_data_dir.absolute())
     pathlib.Path(root_data_dir.absolute()).mkdir(exist_ok=True)
 
     if dataset_dir.exists():
@@ -62,8 +69,8 @@ def prepare_data_set(mode=FROM_ZIPPED):
     dataset_dir = root_data_dir.joinpath(DATASET_NAME)
     if mode == LOCAL_TEST:
         print('TESTING WITH DATA PREPARED LOCALY')
-        root = pathlib.Path('local_tset_data')
-        dataset_dir = root_data_dir.joinpath(DATASET_NAME)
+        root = pathlib.Path('local_test_data')
+        dataset_dir = root.joinpath(DATASET_NAME)
         image_dir = dataset_dir.joinpath(DATASET_IMAGE_FOLDER_NAME)
         mask_dir = dataset_dir.joinpath(DATASET_MASK_FOLDER_NAME)
         return (image_dir, mask_dir)

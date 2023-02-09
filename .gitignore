@@ -1,4 +1,5 @@
 __pycache__
 *thesis-372616-5c0364c4da5f.json
-sun_*.png
-sun_*.jpg
+/**/**/*.jpg
+/**/**/*.png
+.ipynb_checkpoints
