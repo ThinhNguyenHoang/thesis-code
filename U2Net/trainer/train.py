@@ -22,11 +22,11 @@ parser.add_argument('--save_interval', default=None, type=int,
                     help='How many iterations between saving of model weights')
 parser.add_argument('--weights_file', default=None, type=str,
                     help='Output location for model weights. Default: %s' % weights_file)
-parser.add_argument('--data-loading-mode', default=1, type=int,
+parser.add_argument('--data_loading_mode', default=1, type=int,
                     help='Loading dataset mode. zipped = 1 | bucket = 2 | fuse = 3 Default: %s' % 1)
 parser.add_argument('--resume', default=None, type=str,
                     help="Resume training network from saved weights file. Leave as None to start new training.")
-parser.add_argument('--bucket-name', default=None, type=str,
+parser.add_argument('--bucket_name', default=None, type=str,
                     help="Bucket name for loading data and saving model into")
 args = parser.parse_args()
 

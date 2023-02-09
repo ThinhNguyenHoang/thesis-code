@@ -1,6 +1,7 @@
 from setuptools import find_packages
 from setuptools import setup
-
+import os
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./thesis-372616-5c0364c4da5f.json"
 REQUIRED_PACKAGES = [
     # 'gcsfs==0.7.1',
     # 'six==1.15.0'
