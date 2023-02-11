@@ -61,6 +61,9 @@ def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
         zip_file.extractall(root_data_dir.absolute())
 
     clean_dataloader()
+
+def bar_custom(current, total, width=80):
+    print("Downloading: %d%% [%d / %d] bytes" % (current / total * 100, current, total))
 # OUTPUT: (image_dir, output_dir)
 def prepare_data_set(mode=FROM_ZIPPED):
     # Download and store in 'data'
@@ -80,7 +83,7 @@ def prepare_data_set(mode=FROM_ZIPPED):
     elif mode == FROM_BUCKET:
         dataset_url = f'{DATASET_BUCKET_URI}'
         print(f'DOWNLOADING RAW DS FROM BUCKET: {DATASET_BUCKET_URI}')
-        f = wget.download(dataset_url, out=str(root_data_dir.absolute()))
+        f = wget.download(dataset_url, out=str(root_data_dir.absolute()), bar=bar_custom)
         if not pathlib.Path(f).exists():
             return
     elif mode == FROM_FUSE:

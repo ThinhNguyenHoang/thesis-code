@@ -64,7 +64,7 @@ adam = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=.9, beta_2=.999
 cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=weights_file, save_weights_only=True, verbose=1)
 
 
-print("==================== ARGS ========================")
+print("==================== ARGS PARSER ========================")
 print(args)
 print(f"loading_mode: (passed, received) ({args.data_loading_mode}, {data_loading_mode})")
 
@@ -102,8 +102,24 @@ def train():
 
     for sig in [signal.SIGABRT, signal.SIGINT, signal.SIGTSTP]:
         signal.signal(sig, autosave)
+
+    # Tensorboard for monitoring the training process 
+    # Refer: https://gist.github.com/erenon/91f526302cd8e9d21b73f24c0f9c4bb8
+    tensorboard = keras.callbacks.TensorBoard(
+        log_dir='logs',
+        histogram_freq=10,
+        write_graph=True,
+    )
+    tensorboard.set_model(model)
+
+    def named_logs(mode, logs):
+        result = {}
+        for l in zip(model.metrics_names, logs):
+            result[l[0]] = l[1]
+        return result
+
     # Configuration for GPU if possible 
-    gpu_available = tf.test.is_gpu_available()
+    gpu_available = len(tf.config.list_physical_devices('GPU')) > 0 
     if gpu_available:
         print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
         gpus = tf.config.list_logical_devices('GPU')
@@ -115,6 +131,7 @@ def train():
                 try:
                     feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
                     loss = model.train_on_batch(feed, out)
+                    tensorboard.on_epoch_end(e, named_logs(model,loss))
                 except KeyboardInterrupt:
                     save_weights()
                     return
@@ -122,7 +139,7 @@ def train():
                     continue
 
                 if e % 10 == 0:
-                    print('[%05d] Loss: %.4f' % (e, loss))
+                    print('[%05d] GPU Loss: %.4f' % (e, loss), flush=True)
 
                 if save_interval and e > 0 and e % save_interval == 0:
                     save_weights()
@@ -139,7 +156,7 @@ def train():
                 continue
 
             if e % 10 == 0:
-                print('[%05d] Loss: %.4f' % (e, loss))
+                print('[%05d] Loss: %.4f' % (e, loss), flush=True)
 
             if save_interval and e > 0 and e % save_interval == 0:
                 save_weights()
