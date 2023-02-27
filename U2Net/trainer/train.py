@@ -1,3 +1,6 @@
+import sys
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import cv2
 import numpy as np
@@ -5,12 +8,15 @@ import matplotlib.pyplot as plt
 import argparse
 import pathlib
 import signal
+import logging
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 from trainer.config import *
 from trainer.dataloader import *
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
 from trainer.model.u2net import *
+
 
 # Arguments
 parser = argparse.ArgumentParser(description='U^2-NET Training')
@@ -68,6 +74,7 @@ print("==================== ARGS PARSER ========================")
 print(args)
 print(f"loading_mode: (passed, received) ({args.data_loading_mode}, {data_loading_mode})")
 
+loss_metric = tf.keras.metrics.Mean()
 
 def train():
     print('SCRIPT IS STARTED WITH ARGS')
@@ -117,49 +124,67 @@ def train():
         for l in zip(model.metrics_names, logs):
             result[l[0]] = l[1]
         return result
+    tf.debugging.set_log_device_placement(True)
 
-    # Configuration for GPU if possible 
-    gpu_available = len(tf.config.list_physical_devices('GPU')) > 0 
-    if gpu_available:
-        print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-        gpus = tf.config.list_logical_devices('GPU')
-        strategy = tf.distribute.MirroredStrategy(gpus)
-        with strategy.scope():
-            # start training
-            print('Starting training with GPU')
-            for e in range(epochs):
-                try:
-                    feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
-                    loss = model.train_on_batch(feed, out)
-                    tensorboard.on_epoch_end(e, named_logs(model,loss))
-                except KeyboardInterrupt:
-                    save_weights()
-                    return
-                except ValueError:
-                    continue
+    for e in range(epochs):
+        try:
+            feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
+            loss = model.train_on_batch(feed, out)
+        except KeyboardInterrupt:
+            save_weights()
+            return
+        except ValueError:
+            continue
 
-                if e % 10 == 0:
-                    print('[%05d] GPU Loss: %.4f' % (e, loss), flush=True)
+        if e % 10 == 0:
+            print('[%05d] Loss: %.4f' % (e, loss), flush=True)
 
-                if save_interval and e > 0 and e % save_interval == 0:
-                    save_weights()
-    else:
-        print('Starting training with CPU')
-        for e in range(epochs):
-            try:
-                feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
-                loss = model.train_on_batch(feed, out)
-            except KeyboardInterrupt:
-                save_weights()
-                return
-            except ValueError:
-                continue
+        if save_interval and e > 0 and e % save_interval == 0:
+            save_weights()
 
-            if e % 10 == 0:
-                print('[%05d] Loss: %.4f' % (e, loss), flush=True)
+    # # Configuration for GPU if possible 
+    # gpu_available = len(tf.config.list_physical_devices('GPU')) > 0 
+    # if gpu_available:
+    #     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+    #     gpus = tf.config.list_logical_devices('GPU')
+    #     strategy = tf.distribute.MirroredStrategy(gpus)
+    #     with strategy.scope():
+    #         # start training
+    #         print('Starting training with GPU')
+    #         for e in range(epochs):
+    #             print('training on epoch', e)
+    #             try:
+    #                 feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
+    #                 loss = model.train_on_batch(feed, out)
+    #                 tensorboard.on_epoch_end(e, named_logs(model,loss))
+    #             except KeyboardInterrupt:
+    #                 save_weights()
+    #                 return
+    #             except ValueError:
+    #                 continue
 
-            if save_interval and e > 0 and e % save_interval == 0:
-                save_weights()
+    #             if e % 10 == 0:
+    #                 print('[%05d] GPU Loss: %.4f' % (e, loss), flush=True)
+
+    #             if save_interval and e > 0 and e % save_interval == 0:
+    #                 save_weights()
+    # else:
+    #     print('Starting training with CPU')
+    #     for e in range(epochs):
+    #         try:
+    #             feed, out = load_training_batch(batch_size=batch_size, image_dir=image_dir, mask_dir=mask_dir)
+    #             loss = model.train_on_batch(feed, out)
+    #         except KeyboardInterrupt:
+    #             save_weights()
+    #             return
+    #         except ValueError:
+    #             continue
+
+    #         if e % 10 == 0:
+    #             print('[%05d] Loss: %.4f' % (e, loss), flush=True)
+
+    #         if save_interval and e > 0 and e % save_interval == 0:
+    #             save_weights()
 
 if __name__=="__main__":
     train()

@@ -43,9 +43,9 @@ def try_remove_old_data(path_to_delete):
         print('end of removing old dataset')
 
 def download_duts_tr_dataset(dataset_dir=None, root_data_dir=None):
-    dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
-    try_remove_old_data(root_data_dir.absolute())
-    pathlib.Path(root_data_dir.absolute()).mkdir(exist_ok=True)
+    # dataset_url = 'http://saliencydetection.net/duts/download/DUTS-TR.zip'
+    # try_remove_old_data(root_data_dir.absolute())
+    # pathlib.Path(root_data_dir.absolute()).mkdir(exist_ok=True)
 
     if dataset_dir.exists():
         print(f'DATSET ALREADY EXIST: {dataset_dir}')

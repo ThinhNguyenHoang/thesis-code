@@ -3,3 +3,6 @@ __pycache__
 /**/**/*.jpg
 /**/**/*.png
 .ipynb_checkpoints
+*events*
+*.ipynb
+*.h5
