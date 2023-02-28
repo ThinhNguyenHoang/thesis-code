@@ -72,8 +72,9 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=weights_file, save_wei
 
 print("==================== ARGS PARSER ========================")
 print(args)
+bucket_fuse_mode = BUCKET_NAME and data_loading_mode in [FROM_BUCKET, FROM_FUSE]
 print(f"loading_mode: (passed, received) ({args.data_loading_mode}, {data_loading_mode})")
-
+print(f"BUCKET NAME IS:{BUCKET_NAME} and Will I save to bucket ? {'Yes' if bucket_fuse_mode else 'No'}")
 loss_metric = tf.keras.metrics.Mean()
 
 def train():
@@ -95,10 +96,11 @@ def train():
 
     # helper function to save state of model
     def save_weights():
-        print('Saving state of model to %s' % weights_file)
-        if BUCKET_NAME and data_loading_mode in [FROM_BUCKET, FROM_FUSE]:
-            model.save_weights(f'{get_bucket_prefix(BUCKET_NAME)}/weights/{weights_file}')
+        if resume:
+            print('Resume Saving state of model to %s' % weights_file)
+            model.save_weights(resume)
         else:
+            print('Saving state of model to %s' % weights_file)
             model.save_weights(str(weights_file))
     
     # signal handler for early abortion to autosave model state

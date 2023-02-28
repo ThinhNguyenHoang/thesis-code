@@ -1,4 +1,5 @@
-FROM datamachines/cudnn_tensorflow_opencv:11.6.2_2.9.1_4.6.0-20220815
+# FROM datamachines/cudnn_tensorflow_opencv:11.6.2_2.9.1_4.6.0-20220815
+FROM us-central1-docker.pkg.dev/thesis-372616/thesis-registry/base_tf_gpu_with_opencv:latest
 
 ENV BUCKET_NAME=thesis-data-bucket
 ENV PYTHONDONTWRITEBYTECODE=1
