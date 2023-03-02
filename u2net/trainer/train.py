@@ -97,7 +97,7 @@ def train():
     # helper function to save state of model
     def save_weights():
         if resume:
-            print('Resume Saving state of model to %s' % weights_file)
+            print('Resume Saving state of model to %s' % resume)
             model.save_weights(resume)
         else:
             print('Saving state of model to %s' % weights_file)
