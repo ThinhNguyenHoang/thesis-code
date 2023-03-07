@@ -25,7 +25,7 @@ def get_args():
                         help='training/testing (default: training)')
     parser.add_argument('--verbose', default=True, type=bool, metavar='G',
                         help='printing debug message (default: true)')
-    # Model config
+    # Model meta data config
     parser.add_argument('--dataset', default='plant_village', type=str, metavar='D', help='dataset name: plant_village (default: plant_village)')
     parser.add_argument('--bucket_save_path', default='FIX_DEFAULT', type=str, metavar='D',
                         help='where to save model output to')
@@ -49,6 +49,9 @@ def get_args():
                         help='feature extractor: wide_resnet50_2/resnet18/mobilenet_v3_large (default: wide_resnet50_2)')
     parser.add_argument('-decoder', '--decoder-arch', default='freia-cflow', type=str, metavar='A',
                         help='normalizing flow model (default: freia-cflow)')
+    # Dimension of positional encoding / condition for each decoder
+    parser.add_argument('-cond_vec_len', '--condition-vector-length', default=128, type=int, metavar='A',
+                        help='feature extractor: wide_resnet50_2/resnet18/mobilenet_v3_large (default: wide_resnet50_2)')
     # Numbers of pooling layers used <--> How many multiscale-feature maps we have
     parser.add_argument('-pl', '--pool-layers', default=3, type=int, metavar='L',
                         help='number of layers used in NF model (default: 3)')

@@ -1,4 +1,6 @@
 import os, time
+from model import load_encoder_arch
+
 # Arguments
 def encoding_module_eval(features, model):
     anomaly_feature = model.encoder.encode(features)
@@ -15,7 +17,6 @@ def eval_one_batch(input, model):
 
 def train(config):
     # Get the saliency image: (black and white)
-    run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
     pool_layers = config.pool_layers
     print('Number of pooling ', pool_layers)
     # Load encoder in evaluate mode
