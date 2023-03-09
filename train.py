@@ -2,7 +2,7 @@ import os, time
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tf.keras as keras
-from model import load_encoder_arch, load_decoder_arch
+from model import load_encoder_arch, load_decoder_arch, load_saliency_detetor
 from utils.positional_encoding import TFPositionalEncoding2D
 from utils.loss import get_logp, t2np
 import numpy as np
@@ -88,6 +88,69 @@ def train_meta_epoch(config, epoch, loader, encoder, saliency_detector, decoders
         print(f'Epoch: {epoch}.{sub_epoch} train_loss: {mean_train_loss}, lr={1}')
 
 
+IMG_SIZE = [224,224]
+
+def build_general_arch(config):
+    #
+    pool_layers = config.pool_layers
+    print('building keras model', pool_layers)
+    # Load encoder in evaluate mode and model building
+    encoder, pool_layers, pool_dimensions = load_encoder_arch(config, pool_layers)
+
+    decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
+
+    # saliency_detector = load_saliency_detector(config)
+    input_img = keras.layer.Input(shape=(*IMG_SIZE,3))
+    # extract feature maps
+    feature_maps = encoder.predict(input_img)
+    print("num_of_multiscale_features:", len(feature_maps))
+    # extract saliency map
+    saliency_map = saliency_detector.predict(input_img) # HxWx1
+
+    for idx, feature_map in enumerate(feature_maps):
+        batch_size, height, width, depth = feature_map
+        # Interpolate - Resize the salience map to correct size
+        instance_aware = keras.layers.UpSampling2D(size=(height, width))(saliency_map)
+        positional_encoding = TFPositionalEncoding2D(channels=config.cond_vec_len)(feature_map)
+        # Ensure positional_encoding and instance_aware has the same shape 
+        assert instance_aware.shape == positional_encoding.shape, 'encoding and feature map should have same shape'
+        condition_vec = tf.math.multiply(instance_aware, positional_encoding)
+        decoder = decoders[idx]
+        if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
+            z, log_jac_det = decoder(feature_map, [condition_vec])
+        else:
+            z, log_jac_det = decoder(feature_map)
+        #
+        decoder_log_prop = get_logp(depth, z, log_jac_det)
+        log_prob = decoder_log_prob / channel
+        # Normalizing to be in range (0,1)
+        loss= -tf.math.log_sigmoid(log_prob)
+        optimizer.zero_grad()
+        loss.mean().backward()
+        optimizer.step()
+        train_loss += t2np(loss.sum())
+        train_count += len(loss)
+    model = keras.Model(input_img, output)
+    return model
+
+def train_with_keras(config):
+    # Get the saliency image: (black and white)
+    model = build_general_arch(config)
+    # optimizer
+    optimizer = keras.optimizers.Adam(learning_rate=0.01)
+    
+    # Dataset preparation
+    if config.dataset == 'plant_village':
+        train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
+        test_dataset = tfds.load('plant_village', split='test')
+    else:
+        raise NotImplementedError("NOT SUPPORTED DATASET")
+
+    # Network hyperparameters
+    N = 256
+    print(f'train datasete info: len={len(train_dataset)}')
+    print(f'test datasete info: len={len(test_dataset)}')
+    pass
 
 def train(config):
     # Get the saliency image: (black and white)
@@ -98,6 +161,9 @@ def train(config):
 
     decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
 
+    # saliency_detector = load_saliency_detector(config)
+    
+    model = build_general_arch(config, encoder, decoders, saliency_detector)
     # optimizer
     optimizer = keras.optimizers.Adam(learning_rate=0.01)
     
@@ -115,13 +181,12 @@ def train(config):
     # stats: AUROC RAUPRO ...
     
     #
-    if config.action_type == 'norm-test':
-        config.meta_epochs = 1
-    for epoch in range(config.meta_epochs):
-        if config.action_type == 'testing' and config.checkpoint:
-            load_weights(encoder,decoders, config.checkpoint)
-        elif config.action_type == 'training':
-            print("TRAIN META EPOCH: ", epoch)
-            train_meta_epoch(config, epoch, train_dataset, encoder, )
-        else:
-            raise NotImplementedError("Unsupported mode")
+    # if config.action_type == 'norm-test':
+    #     config.meta_epochs = 1
+    # for epoch in range(config.meta_epochs):
+    #     if config.action_type == 'testing' and config.checkpoint:
+    #         load_weights(encoder,decoders, config.checkpoint)
+    #     elif config.action_type == 'training':
+    #         print("TRAIN META EPOCH: ", epoch)
+    #     else:
+    #         raise NotImplementedError("Unsupported mode")

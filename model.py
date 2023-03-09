@@ -8,6 +8,8 @@ from typing import *
 from sub_models.tfdetection.tfdet.model.backbone.resnet import RESNET_NBLOCKS_CONFIG
 from sub_models.tfdetection.tfdet.model.backbone.resnet import wide_resnet50_2
 
+def load_saliency_detetor(config):
+    return config.saliency_detector
 def compute_conv_layer_name(stage_idx, block_idx, block_type):
     conv_layer_name = ''
     # Watch resnet.py for more context
