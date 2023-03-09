@@ -80,8 +80,9 @@ def flow_with_condition(config, input_dimension):
     for _ in range(config.coupling_blocks):
         coder.add(GLOWCouplingBlock(input_dimension,condition_dimension, None, subnet_fc))
     return coder
+
 # target: Load a single flow (an decoder)
-def load_decoder_atch(config, input_dimension):
+def load_decoder_arch(config, input_dimension):
     decoder_arch = config.decoder_arch
     if decoder_arch == 'freia-flow':
         decoder = flow_without_condition(config, input_dimension)
