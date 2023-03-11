@@ -3,7 +3,7 @@
 from typing import Dict, Callable, Union
 import tensorflow as tf
 
-from MoINN.modules.base import InvertibleModule
+from .base import InvertibleModule
 
 
 # pylint: disable=C0103, R1729, E1120, E1124, W0221
@@ -312,7 +312,6 @@ class GLOWCouplingBlock(_BaseCouplingBlock):
             object can be passed. TANH behaves like the original realNVP paper.
             A custom function should take tensors and map -inf to -1 and +inf to +1.
         """
-
         super().__init__(dims_in, dims_c, clamp, clamp_activation)
 
         self.subnet1 = subnet_constructor(

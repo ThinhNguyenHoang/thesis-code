@@ -8,8 +8,7 @@ import numpy as np
 import tensorflow as tf
 from scipy.stats import special_ortho_group
 
-from MoINN.modules.base import InvertibleModule
-
+from .base import InvertibleModule
 
 # pylint: disable=C0103, R1729, E1124, E1120, W0221
 class AllInOneBlock(InvertibleModule):

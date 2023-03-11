@@ -1,7 +1,7 @@
 import os, time
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import tf.keras as keras
+import tensorflow.keras as keras
 from model import load_encoder_arch, load_decoder_arch, load_saliency_detetor
 from utils.positional_encoding import TFPositionalEncoding2D
 from utils.loss import get_logp, t2np
@@ -87,10 +87,17 @@ def train_meta_epoch(config, epoch, loader, encoder, saliency_detector, decoders
     if config.verbose:
         print(f'Epoch: {epoch}.{sub_epoch} train_loss: {mean_train_loss}, lr={1}')
 
+def load_saliency_detector(config):
+    if config.saliency_detector:
+        return 1
+    
+    return None
 
 IMG_SIZE = [224,224]
 
 def build_general_arch(config):
+    #
+    optimizer = keras.optimizers.Adam(learning_rate=0.0001)
     #
     pool_layers = config.pool_layers
     print('building keras model', pool_layers)
@@ -99,13 +106,14 @@ def build_general_arch(config):
 
     decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
 
-    # saliency_detector = load_saliency_detector(config)
+    saliency_detector = load_saliency_detector(config)
+
     input_img = keras.layer.Input(shape=(*IMG_SIZE,3))
     # extract feature maps
     feature_maps = encoder.predict(input_img)
     print("num_of_multiscale_features:", len(feature_maps))
     # extract saliency map
-    saliency_map = saliency_detector.predict(input_img) # HxWx1
+    saliency_map = saliency_detector(input_img) # HxWx1
 
     for idx, feature_map in enumerate(feature_maps):
         batch_size, height, width, depth = feature_map
@@ -121,16 +129,19 @@ def build_general_arch(config):
         else:
             z, log_jac_det = decoder(feature_map)
         #
-        decoder_log_prop = get_logp(depth, z, log_jac_det)
-        log_prob = decoder_log_prob / channel
-        # Normalizing to be in range (0,1)
-        loss= -tf.math.log_sigmoid(log_prob)
-        optimizer.zero_grad()
-        loss.mean().backward()
-        optimizer.step()
+        with tf.GradientTape() as tape:
+            decoder_log_prob = get_logp(depth, z, log_jac_det)
+            log_prob = decoder_log_prob / depth
+            # Normalizing to be in range (0,1)
+            loss= -tf.math.log_sigmoid(log_prob)
+            loss = tf.math.reduce_mean(loss)
+        gradients = tape.gradient(loss, decoder.trainable_weights)
+        optimizer.apply_gradient(zip(gradients, decoder.trainable_weights))
         train_loss += t2np(loss.sum())
         train_count += len(loss)
-    model = keras.Model(input_img, output)
+
+    model = keras.Model(inputs=input_img, outputs=[decoder.output for decoder in decoders])
+    model.summary()
     return model
 
 def train_with_keras(config):
@@ -164,8 +175,6 @@ def train(config):
     # saliency_detector = load_saliency_detector(config)
     
     model = build_general_arch(config, encoder, decoders, saliency_detector)
-    # optimizer
-    optimizer = keras.optimizers.Adam(learning_rate=0.01)
     
     # Dataset preparation
     if config.dataset == 'plant_village':
