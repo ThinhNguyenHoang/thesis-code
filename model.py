@@ -2,6 +2,9 @@ import tensorflow as tf
 from config import Config
 from tensorflow.keras import layers
 from sub_models.MoINN.modules.coupling_layers import GLOWCouplingBlock
+from sub_models.MoINN.modules.all_in_one_block import AllInOneBlock
+import sub_models.u2net.eval as u2net_eval
+
 from utils import debug
 
 from typing import *
@@ -11,8 +14,23 @@ sys.path.append('./sub_models/tfdetection')
 from sub_models.tfdetection.tfdet.model.backbone.resnet import RESNET_NBLOCKS_CONFIG, RESNET_OUTPUT_NAMES_CONFIG, ResNetArchOutputsDict
 from sub_models.tfdetection.tfdet.model.backbone.resnet import wide_resnet50_2
 
-def load_saliency_detetor(config):
-    return config.saliency_detector
+def load_u2_net_eval(config):
+    path = 'sub_models/u2net/weights/u2net.h5'
+    # print("Loading saliency detector at:", path)
+    # place_holder = tf.keras.Input(shape=(224,224,3))
+    # u2_net = U2NET()
+    # model = u2_net(place_holder)
+    # model = tf.keras.Model(inputs=place_holder, outputs=u2_net, name='u2net_detector')
+    model = u2net_eval.load_model_for_eval(path,config)
+    return model
+
+def load_saliency_detector(config:Config):
+    saliency_detector = None
+    if config.saliency_detector == 'u2net':
+        saliency_detector = load_u2_net_eval(config)
+    if not saliency_detector:
+        raise NotImplementedError('Saliency detector is not supported')
+    return saliency_detector
 
 # Delay the application of the network
 def load_encoder_arch(config, num_pool_layers):
@@ -44,7 +62,7 @@ def load_encoder_arch(config, num_pool_layers):
     return encoder, num_pool_layers, pool_dimensions
 
 # Simple network for predicting parameters of the flows
-def subnet_fc(dimension_in, dimension_out):
+def subnet_fc(meta, dimension_in, dimension_out):
     model = tf.keras.Sequential()
     model.add(layers.Input(shape=(dimension_in,)))
     model.add(layers.Dense(2*dimension_in,activation=None))
@@ -66,12 +84,12 @@ def flow_without_condition(config,input_dimension):
 
 def flow_with_condition(config: Config, input_dimension):
     condition_dimension = config.cond_vec_len
-    coder = tf.keras.Sequential()
-    if config.verbose:
-        print('CNF coder', condition_dimension)
+    pool_dimension = input_dimension[-1]
+    inp = tuple(input_dimension[:])
+    cond = tuple([*inp[:-1],condition_dimension])
     for _ in range(config.coupling_blocks):
-        coder.add(GLOWCouplingBlock(input_dimension,condition_dimension, None, subnet_fc))
-    return coder
+        x = AllInOneBlock(inp, [cond],None,subnet_fc,permute_soft=False)
+    return x
 
 # target: Load a single flow (an decoder)
 def load_decoder_arch(config: Config, input_dimension):

@@ -6,10 +6,9 @@ import argparse
 
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D, Input, BatchNormalization, ReLU, MaxPool2D, UpSampling2D
-
-from trainer.model.u2net import *
-from trainer.config import *
-from trainer.dataloader import *
+from .trainer.model.u2net import *
+from .trainer.config import *
+from .trainer.dataloader import *
 
 def str2bool(v):
     return v is not None and v.lower() in ("yes", "true", "t", "1")
@@ -35,6 +34,41 @@ if args.output:
 
 def apply_mask(img, mask):
     return np.multiply(img, mask)
+
+def load_model_for_eval(path, config=None):
+    inputs = keras.Input(shape=default_in_shape)
+    net = U2NET()
+    out = net(inputs)
+    model = keras.Model(inputs=inputs, outputs=out, name='u2netmodel')
+    model.compile(optimizer=adam, loss=bce_loss, metrics=None)
+    model.load_weights(path)
+    return model
+
+def get_saliency_map(model, image):
+    image = Image.open(image).convert('RGB')
+    input_image = image
+    if image.size != default_in_shape:
+        input_image = image.resize(default_in_shape[:2], Image.BICUBIC)
+    
+    input_tensor = format_input(input_image)
+    fused_mask_tensor = model(input_tensor, Image.BICUBIC)[0][0]
+    output_mask = np.asarray(fused_mask_tensor)
+    
+    if image.size != default_in_shape:
+        output_mask = cv2.resize(output_mask, dsize=image.size)
+    
+    output_mask = np.tile(np.expand_dims(output_mask, axis=2), [1, 1, 3])
+    output_image = np.expand_dims(np.array(image)/255., 0)[0]
+    if args.apply_mask:
+        output_image = apply_mask(output_image, output_mask)
+    else:
+        output_image = output_mask
+
+    if args.merged:
+        output_image = np.concatenate((output_mask, output_image), axis=1)
+
+    output_image = cv2.cvtColor(output_image.astype('float32'), cv2.COLOR_BGR2RGB) * 255.
+    return output_image
 
 def main():
     input_images = []

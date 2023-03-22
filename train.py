@@ -2,24 +2,15 @@ import os, time
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow.keras as keras
-from model import load_encoder_arch, load_decoder_arch, load_saliency_detetor
+from model import load_encoder_arch, load_decoder_arch,load_saliency_detector
 from utils.positional_encoding import TFPositionalEncoding2D
 from utils.loss import get_logp, t2np
+from config import Config
+import sub_models.u2net.eval as u2net_eval
 import numpy as np
+import cv2
+from PIL import Image
 
-# Arguments
-# def encoding_module_eval(features, model):
-#     anomaly_feature = model.encoder.encode(features)
-#     # Calculate loglikelyhood and estimate density
-#     score = get_score(anomaly_feature)
-#     pass
-
-def eval_one_batch(input, model):
-    # Calculate the salient object:
-    salient_obj_img  = model.saliency_detector.eval(input)
-    features = model.feature_extrator.eval(input) # L feature map
-    
-    pass
 # condition = saliency_map * positional_encoding
 def get_condition_vec(positional_embedding, saliency_map):
     return tf.math.multiply(positional_embedding, saliency_map)
@@ -87,11 +78,6 @@ def train_meta_epoch(config, epoch, loader, encoder, saliency_detector, decoders
     if config.verbose:
         print(f'Epoch: {epoch}.{sub_epoch} train_loss: {mean_train_loss}, lr={1}')
 
-def load_saliency_detector(config):
-    if config.saliency_detector:
-        return 1
-    
-    return None
 
 IMG_SIZE = [224,224]
 
@@ -108,24 +94,29 @@ def build_general_arch(config):
 
     saliency_detector = load_saliency_detector(config)
 
-    input_img = keras.layer.Input(shape=(*IMG_SIZE,3))
+    input_img = keras.layers.Input(shape=(*IMG_SIZE,3))
     # extract feature maps
-    feature_maps = encoder.predict(input_img)
+    feature_maps = encoder(input_img)
     print("num_of_multiscale_features:", len(feature_maps))
+
     # extract saliency map
-    saliency_map = saliency_detector(input_img) # HxWx1
+    saliency_map = saliency_detector(input_img, Image.BICUBIC)[0] # BxHxWx1
+    # input_img = tf.keras.utils.array_to_img(input_img)
+    # saliency_map = u2net_eval.get_saliency_map(saliency_detector, img_copy)
 
     for idx, feature_map in enumerate(feature_maps):
-        batch_size, height, width, depth = feature_map
+        batch_size, height, width, depth = feature_map.shape
         # Interpolate - Resize the salience map to correct size
-        instance_aware = keras.layers.UpSampling2D(size=(height, width))(saliency_map)
-        positional_encoding = TFPositionalEncoding2D(channels=config.cond_vec_len)(feature_map)
-        # Ensure positional_encoding and instance_aware has the same shape 
-        assert instance_aware.shape == positional_encoding.shape, 'encoding and feature map should have same shape'
+        # instance_aware = keras.layers.UpSampling2D(size=(height, width))(saliency_map)
+        # instance_aware = keras.layers.Reshape(target_shape=(height, width, config.cond_vec_len))(saliency_map)
+        instance_aware = tf.reshape(saliency_map, [height, width,-1])
+        positional_encoding = TFPositionalEncoding2D(channels=config.cond_vec_len)(feature_map) # HxWxD
+        # Ensure positional_encoding and instance_aware has the same shape
+        # assert instance_aware.shape == positional_encoding.shape, 'encoding and feature map should have same shape'
         condition_vec = tf.math.multiply(instance_aware, positional_encoding)
         decoder = decoders[idx]
         if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
-            z, log_jac_det = decoder(feature_map, [condition_vec])
+            z, log_jac_det = decoder(feature_map, [condition_vec,])
         else:
             z, log_jac_det = decoder(feature_map)
         #
@@ -168,25 +159,27 @@ def train(config):
     pool_layers = config.pool_layers
     print('Number of pooling ', pool_layers)
     # Load encoder in evaluate mode and model building
-    encoder, pool_layers, pool_dimensions = load_encoder_arch(config, pool_layers)
+    # encoder, pool_layers, pool_dimensions = load_encoder_arch(config, pool_layers)
 
-    decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
+    # decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
 
     # saliency_detector = load_saliency_detector(config)
     
-    model = build_general_arch(config, encoder, decoders, saliency_detector)
+    # model = build_general_arch(config, encoder, decoders, saliency_detector)
     
     # Dataset preparation
     if config.dataset == 'plant_village':
         train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
-        test_dataset = tfds.load('plant_village', split='test')
+        # test_dataset = tfds.load('plant_village', split='test')
     else:
         raise NotImplementedError("NOT SUPPORTED DATASET")
 
     # Network hyperparameters
     N = 256
     print(f'train datasete info: len={len(train_dataset)}')
-    print(f'test datasete info: len={len(test_dataset)}')
+    # print(f'test datasete info: len={len(test_dataset)}')
+
+    train_with_keras(config)
     # stats: AUROC RAUPRO ...
     
     #

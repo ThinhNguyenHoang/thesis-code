@@ -3,6 +3,9 @@ import argparse
 
 INPUT_SIZE = 256 # 256x256
 BATCH_SIZE = 12
+
+COUPLING_BLOCKS = 4
+POOLING_LAYERS = 3
 class Config(argparse.Namespace):
     action_type: str
     verbose: bool
@@ -25,6 +28,7 @@ class Config(argparse.Namespace):
     epoch: int
     # model arch config
     # Saliency config
+    saliency_detector: str
     feature_extractor: str # String like: wide_resnet_50_2 | densenet,...
     encoder_arch: str
     decoder_arch: str # freia-cflow | freia-flow
@@ -71,6 +75,8 @@ def get_args():
     parser.add_argument('-lr','--learning-rate', type=float, default=2e-4, metavar='LR',
                         help='learning rate (default: 2e-4)')
     # Model Architecture
+    parser.add_argument('--saliency_detector', default='u2net', type=str, metavar='A',
+                        help='saliency detector: u2net/basnet')
     parser.add_argument('--encoder-arch', default='wide_resnet50_2', type=str, metavar='A',
                         help='feature extractor: wide_resnet50_2/resnet18/mobilenet_v3_large (default: wide_resnet50_2)')
     parser.add_argument('--decoder-arch', default='freia-cflow', type=str, metavar='A',
@@ -79,10 +85,10 @@ def get_args():
     parser.add_argument('--cond_vec_len', default=128, type=int, metavar='A',
                         help='feature extractor: wide_resnet50_2/resnet18/mobilenet_v3_large (default: wide_resnet50_2)')
     # Numbers of pooling layers used <--> How many multiscale-feature maps we have
-    parser.add_argument('-pl', '--pool-layers', default=3, type=int, metavar='L',
+    parser.add_argument('-pl', '--pool-layers', default=POOLING_LAYERS, type=int, metavar='L',
                         help='number of layers used in NF model (default: 3)')
     # Numbers of coupling blocks <--> How many chained copupling blocks we want to have for each of the decoder
-    parser.add_argument('-cb', '--coupling-blocks', default=8, type=int, metavar='L',
+    parser.add_argument('-cb', '--coupling-blocks', default=COUPLING_BLOCKS, type=int, metavar='L',
                         help='number of layers used in NF model (default: 8)')
 
     # Load weights of old model

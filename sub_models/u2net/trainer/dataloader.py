@@ -10,7 +10,7 @@ import shutil
 # sys.path.append('./')
 from enum import Enum
 
-from trainer.config import *
+from .config import *
 from PIL import Image 
 
 cache = None
