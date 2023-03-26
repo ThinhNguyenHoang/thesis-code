@@ -1,8 +1,8 @@
 # from typing import TypedDict, Union
 import argparse
 
-INPUT_SIZE = 256 # 256x256
-BATCH_SIZE = 12
+INPUT_SIZE = 224 # 256x256
+BATCH_SIZE = 8
 
 COUPLING_BLOCKS = 4
 POOLING_LAYERS = 3
@@ -60,7 +60,7 @@ def get_args():
     parser.add_argument('--bucket_save_path', default='FIX_DEFAULT', type=str, metavar='D',
                         help='where to save model output to')
     parser.add_argument('--input-size', default=INPUT_SIZE, type=int, metavar='C',
-                        help='image resize dimensions (default: 256)')
+                        help='image resize dimensions (default: 224)')
 
     # Evaluation config
     parser.add_argument('--pro', action='store_true', default=False,

@@ -223,6 +223,7 @@ class RNVPCouplingBlock(_BaseCouplingBlock):
           clamp_activation: Function to perform the clamping. String values
             "ATAN", "TANH", and "SIGMOID" are recognized, or a function of
             object can be passed. TANH behaves like the original realNVP paper.
+            
             A custom function should take tensors and map -inf to -1 and +inf to +1.
         """
 

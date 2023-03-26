@@ -36,7 +36,10 @@ def apply_mask(img, mask):
     return np.multiply(img, mask)
 
 def load_model_for_eval(path, config=None):
-    inputs = keras.Input(shape=default_in_shape)
+    config_shape = config.input_size
+    inputs = keras.layers.Input(shape=default_in_shape)
+    if config_shape:
+        inputs = keras.layers.Input(shape=(config_shape, config_shape, 3))
     net = U2NET()
     out = net(inputs)
     model = keras.Model(inputs=inputs, outputs=out, name='u2netmodel')

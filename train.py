@@ -10,6 +10,8 @@ import sub_models.u2net.eval as u2net_eval
 import numpy as np
 import cv2
 from PIL import Image
+from tensorflow.python.framework.ops import disable_eager_execution 
+disable_eager_execution()
 
 # condition = saliency_map * positional_encoding
 def get_condition_vec(positional_embedding, saliency_map):
@@ -46,8 +48,8 @@ def train_meta_epoch(config, epoch, loader, encoder, saliency_detector, decoders
                 positional_embedding = tf.tile(positional_embedding, [batch_size, 1, 1, 1]) # BxHxWxD
 
                 #
-                feature_map = tf.reshape(tf.tranpose(tf.reshape(batch_size, channel, image_size), [0, 2, 1]), embed_size, channel)
-                positional_embedding = tf.reshape(tf.tranpose(tf.reshape(batch_size, cond_vec_len, image_size), [0, 2, 1]), embed_size, cond_vec_len)
+                feature_map = tf.reshape(tf.transpose(tf.reshape(batch_size, channel, image_size), [0, 2, 1]), embed_size, channel)
+                positional_embedding = tf.reshape(tf.transpose(tf.reshape(batch_size, cond_vec_len, image_size), [0, 2, 1]), embed_size, cond_vec_len)
 
                 rng = np.random.default_rng()
                 perm = rng.shuffle(np.arange(embed_size))
@@ -79,11 +81,13 @@ def train_meta_epoch(config, epoch, loader, encoder, saliency_detector, decoders
         print(f'Epoch: {epoch}.{sub_epoch} train_loss: {mean_train_loss}, lr={1}')
 
 
-IMG_SIZE = [224,224]
 
 def build_general_arch(config):
     #
-    optimizer = keras.optimizers.Adam(learning_rate=0.0001)
+    img_size = config.input_size
+    IMG_SIZE = [img_size, img_size]
+    #
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001)
     #
     pool_layers = config.pool_layers
     print('building keras model', pool_layers)
@@ -107,29 +111,50 @@ def build_general_arch(config):
     for idx, feature_map in enumerate(feature_maps):
         batch_size, height, width, depth = feature_map.shape
         # Interpolate - Resize the salience map to correct size
-        # instance_aware = keras.layers.UpSampling2D(size=(height, width))(saliency_map)
-        # instance_aware = keras.layers.Reshape(target_shape=(height, width, config.cond_vec_len))(saliency_map)
-        instance_aware = tf.reshape(saliency_map, [height, width,-1])
+        # instance_aware = tf.reshape(saliency_map, [batch_size,height, width,-1])
+        instance_aware = tf.image.resize(saliency_map, [height,width])
         positional_encoding = TFPositionalEncoding2D(channels=config.cond_vec_len)(feature_map) # HxWxD
         # Ensure positional_encoding and instance_aware has the same shape
         # assert instance_aware.shape == positional_encoding.shape, 'encoding and feature map should have same shape'
-        condition_vec = tf.math.multiply(instance_aware, positional_encoding)
+        condition_vec = tf.math.multiply(instance_aware, positional_encoding) # BxHxD -- D = dimensions of encodings
         decoder = decoders[idx]
-        if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
-            z, log_jac_det = decoder(feature_map, [condition_vec,])
-        else:
-            z, log_jac_det = decoder(feature_map)
+        # FIBER PROCESSING 
+        # feature_map: BxHxC ---- C: channels of pooling layers
+        # condition_vec: BxHxD ------ D: dimension of positional encoding
+        squared_size = height * width # HxW
+        num_features_vecs = batch_size * squared_size # Bx(HW)
+
+        features = tf.reshape(feature_map, [num_features_vecs, depth])
+        conditions = tf.reshape(condition_vec, [num_features_vecs, config.cond_vec_len])
         #
-        with tf.GradientTape() as tape:
-            decoder_log_prob = get_logp(depth, z, log_jac_det)
-            log_prob = decoder_log_prob / depth
-            # Normalizing to be in range (0,1)
-            loss= -tf.math.log_sigmoid(log_prob)
-            loss = tf.math.reduce_mean(loss)
-        gradients = tape.gradient(loss, decoder.trainable_weights)
-        optimizer.apply_gradient(zip(gradients, decoder.trainable_weights))
-        train_loss += t2np(loss.sum())
-        train_count += len(loss)
+        N = 240
+        UNIT = num_features_vecs // N + int(num_features_vecs % N > 0)
+        perm = tf.random.shuffle(np.arange(num_features_vecs))
+        train_loss = 0
+        for unit in range(UNIT):
+            if unit < (UNIT -1):
+                idx = np.arange(unit * N, (unit + 1) * N)
+            else:
+                idx = np.arange(unit*N, num_features_vecs)
+            #
+            perm_idx = tf.gather(perm, idx)
+            feature_patch = tf.gather(features, perm_idx) # NxC ----- C:channels
+            condition_patch = tf.gather(conditions, perm_idx) #  NxP ---------- P: pos_enc dimensitons
+            
+            with tf.GradientTape() as tape:
+                if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
+                    z, log_jac_det = decoder(feature_patch, [condition_patch,])
+                else:
+                    z, log_jac_det = decoder(feature_patch)
+                decoder_log_prob = get_logp(depth, z, log_jac_det)
+                log_prob = decoder_log_prob / depth
+                # Normalizing to be in range (0,1)
+                loss= -tf.math.log_sigmoid(log_prob)
+                loss = tf.math.reduce_mean(loss)
+                gradients = tape.gradient(loss, decoder.trainable_weights)
+            optimizer.apply_gradients(zip(gradients, decoder.trainable_weights))
+            # train_loss += t2np(tf.reduce_sum(loss))
+            # train_count += len(loss)
 
     model = keras.Model(inputs=input_img, outputs=[decoder.output for decoder in decoders])
     model.summary()
@@ -144,7 +169,7 @@ def train_with_keras(config):
     # Dataset preparation
     if config.dataset == 'plant_village':
         train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
-        test_dataset = tfds.load('plant_village', split='test')
+        # test_dataset = tfds.load('plant_village', split='test')
     else:
         raise NotImplementedError("NOT SUPPORTED DATASET")
 
@@ -176,7 +201,7 @@ def train(config):
 
     # Network hyperparameters
     N = 256
-    print(f'train datasete info: len={len(train_dataset)}')
+    print(f'train datasete info: len={train_dataset.cardinality()}')
     # print(f'test datasete info: len={len(test_dataset)}')
 
     train_with_keras(config)

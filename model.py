@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow.keras as keras
 from config import Config
 from tensorflow.keras import layers
 from sub_models.MoINN.modules.coupling_layers import GLOWCouplingBlock
@@ -40,7 +41,7 @@ def load_encoder_arch(config, num_pool_layers):
     #
     input_size = config.input_size
     IMAGE_SIZE = (input_size, input_size, 3)
-    inputs = layers.Input(shape=(IMAGE_SIZE))
+    inputs = layers.Input(shape=(IMAGE_SIZE), batch_size= config.batch_size)
 
     enc_arch = config.encoder_arch
     if 'resnet' in enc_arch:
@@ -63,8 +64,10 @@ def load_encoder_arch(config, num_pool_layers):
 
 # Simple network for predicting parameters of the flows
 def subnet_fc(meta, dimension_in, dimension_out):
+    feature_map_dims = meta['feature_map_dims']
+    condition_dims = meta['condition_dims']
     model = tf.keras.Sequential()
-    model.add(layers.Input(shape=(dimension_in,)))
+    # model.add(layers.Conv2D())
     model.add(layers.Dense(2*dimension_in,activation=None))
     model.add(layers.ReLU())
     model.add(layers.Dense(dimension_out))
@@ -84,11 +87,11 @@ def flow_without_condition(config,input_dimension):
 
 def flow_with_condition(config: Config, input_dimension):
     condition_dimension = config.cond_vec_len
-    pool_dimension = input_dimension[-1]
+    # pool_dimension = input_dimension[-1]
     inp = tuple(input_dimension[:])
     cond = tuple([*inp[:-1],condition_dimension])
     for _ in range(config.coupling_blocks):
-        x = AllInOneBlock(inp, [cond],None,subnet_fc,permute_soft=False)
+        x = AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': inp, 'condition_dims': cond},subnet_fc,permute_soft=False)
     return x
 
 # target: Load a single flow (an decoder)
@@ -103,3 +106,20 @@ def load_decoder_arch(config: Config, input_dimension):
     else:
         raise NotImplementedError('Unsupported decoder architecture')
     return decoder
+
+class MainModel(keras.Model):
+    def __init__(self, ):
+        super().__init__()   
+
+    @property
+    def metrics(self):
+        pass
+
+    def compile(self, optimizer, loss_fn):
+        pass
+    
+    def train_step(self, input):
+        pass
+    
+    def eval_step(self, input):
+        pass
