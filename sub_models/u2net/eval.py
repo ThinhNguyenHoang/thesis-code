@@ -42,7 +42,7 @@ def load_model_for_eval(path, config=None):
         inputs = keras.layers.Input(shape=(config_shape, config_shape, 3))
     net = U2NET()
     out = net(inputs)
-    model = keras.Model(inputs=inputs, outputs=out, name='u2netmodel')
+    model = keras.Model(inputs=inputs, outputs=out, name='saliency_detector_u2net', trainable=False)
     model.compile(optimizer=adam, loss=bce_loss, metrics=None)
     model.load_weights(path)
     return model

@@ -233,7 +233,7 @@ class AllInOneBlock(InvertibleModule):
         x1, x2 = tf.split(x, self.splits, axis=-1)
 
         if self.conditional:
-            x1c = tf.concat([x1, *c], -1)
+            x1c = tf.concat([x1, c], -1)
         else:
             x1c = x1
 

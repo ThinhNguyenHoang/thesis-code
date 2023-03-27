@@ -2,7 +2,7 @@ import os, time
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow.keras as keras
-from model import load_encoder_arch, load_decoder_arch,load_saliency_detector
+from model import load_encoder_arch, load_decoder_arch,load_saliency_detector, subnet_fc
 from utils.positional_encoding import TFPositionalEncoding2D
 from utils.loss import get_logp, t2np
 from config import Config
@@ -11,8 +11,10 @@ import numpy as np
 import cv2
 from PIL import Image
 from tensorflow.python.framework.ops import disable_eager_execution 
+from utils.loss import negative_log_likelihood
 disable_eager_execution()
 
+from main_model import MainModel
 # condition = saliency_map * positional_encoding
 def get_condition_vec(positional_embedding, saliency_map):
     return tf.math.multiply(positional_embedding, saliency_map)
@@ -143,7 +145,8 @@ def build_general_arch(config):
             
             with tf.GradientTape() as tape:
                 if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
-                    z, log_jac_det = decoder(feature_patch, [condition_patch,])
+                    # inp = layers.Concatenate([feature_patch, condition_patch])
+                    z, log_jac_det = decoder([feature_patch, [condition_patch,]])
                 else:
                     z, log_jac_det = decoder(feature_patch)
                 decoder_log_prob = get_logp(depth, z, log_jac_det)
@@ -161,37 +164,39 @@ def build_general_arch(config):
     return model
 
 def train_with_keras(config):
-    # Get the saliency image: (black and white)
-    model = build_general_arch(config)
-    # optimizer
-    optimizer = keras.optimizers.Adam(learning_rate=0.01)
+    # # Get the saliency image: (black and white)
+    # model = build_general_arch(config)
+    # # optimizer
+    # optimizer = keras.optimizers.Adam(learning_rate=0.01)
     
-    # Dataset preparation
-    if config.dataset == 'plant_village':
-        train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
-        # test_dataset = tfds.load('plant_village', split='test')
-    else:
-        raise NotImplementedError("NOT SUPPORTED DATASET")
+    # # Dataset preparation
+    # if config.dataset == 'plant_village':
+    #     train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
+    #     # test_dataset = tfds.load('plant_village', split='test')
+    # else:
+    #     raise NotImplementedError("NOT SUPPORTED DATASET")
 
-    # Network hyperparameters
-    N = 256
-    print(f'train datasete info: len={len(train_dataset)}')
-    print(f'test datasete info: len={len(test_dataset)}')
+    # # Network hyperparameters
+    # N = 256
+    # print(f'train datasete info: len={len(train_dataset)}')
+    # print(f'test datasete info: len={len(test_dataset)}')
     pass
 
+def train_with_keras_subclass(config: Config, dataset=None, loader=None):
+    adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+    img_size = config.input_size
+    # inp = keras.layers.Input(shape=(img_size,img_size,3), batch_size=config.batch_size)
+    model = MainModel(config=config, subnet_fc=subnet_fc)
+    # model = keras.Model(inputs=inp, outputs=[decoder.output for decoder in main.decoders.layers])
+    model.compile(optimizer=adam, loss_fn=negative_log_likelihood)
+    # model.build(input_shape=(img_size, img_size, 3), batch)
+    model.fit(loader, epochs=config.sub_epochs, callbacks=[])
+    
 def train(config):
     # Get the saliency image: (black and white)
     pool_layers = config.pool_layers
     print('Number of pooling ', pool_layers)
     # Load encoder in evaluate mode and model building
-    # encoder, pool_layers, pool_dimensions = load_encoder_arch(config, pool_layers)
-
-    # decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
-
-    # saliency_detector = load_saliency_detector(config)
-    
-    # model = build_general_arch(config, encoder, decoders, saliency_detector)
-    
     # Dataset preparation
     if config.dataset == 'plant_village':
         train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
@@ -204,16 +209,6 @@ def train(config):
     print(f'train datasete info: len={train_dataset.cardinality()}')
     # print(f'test datasete info: len={len(test_dataset)}')
 
-    train_with_keras(config)
-    # stats: AUROC RAUPRO ...
+    # train_with_keras_subclass(config, loader=train_dataset)
     
-    #
-    # if config.action_type == 'norm-test':
-    #     config.meta_epochs = 1
-    # for epoch in range(config.meta_epochs):
-    #     if config.action_type == 'testing' and config.checkpoint:
-    #         load_weights(encoder,decoders, config.checkpoint)
-    #     elif config.action_type == 'training':
-    #         print("TRAIN META EPOCH: ", epoch)
-    #     else:
-    #         raise NotImplementedError("Unsupported mode")
+    model = build_general_arch(config)

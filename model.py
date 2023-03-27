@@ -34,7 +34,7 @@ def load_saliency_detector(config:Config):
     return saliency_detector
 
 # Delay the application of the network
-def load_encoder_arch(config, num_pool_layers):
+def load_encoder_arch(config:Config, num_pool_layers):
     # Load the encoder in eval mode (pretrained)
     pool_dimensions = list()
 
@@ -59,7 +59,8 @@ def load_encoder_arch(config, num_pool_layers):
         #     layer_output_shape =resnet_get_layer_output_shape(model=encoder,stage_idx=idx + 1, block_idx=num_block, resnet_arch=enc_arch)
         #     pool_dimensions.append(layer_output_shape)
         pool_dimensions = [encoder.get_layer(name=layer_name).output_shape for layer_name in resnet_output_names]
-        debug.debug_print(f"ENCODER[0]LAYER: {pool_dimensions[0]} ")
+        if config.verbose:
+            debug.debug_print(f"ENCODER[0]LAYER: {pool_dimensions[0]} ")
     return encoder, num_pool_layers, pool_dimensions
 
 # Simple network for predicting parameters of the flows
@@ -86,13 +87,29 @@ def flow_without_condition(config,input_dimension):
     return coder
 
 def flow_with_condition(config: Config, input_dimension):
+    # condition_dimension = config.cond_vec_len
+    # # pool_dimension = input_dimension[-1]
+    # inp = tuple(input_dimension[:])
+    # cond = tuple([*inp[:-1],condition_dimension])
+    # for _ in range(config.coupling_blocks):
+    #     x = AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': inp, 'condition_dims': cond},subnet_fc,permute_soft=False)
+    # return x
     condition_dimension = config.cond_vec_len
     # pool_dimension = input_dimension[-1]
-    inp = tuple(input_dimension[:])
-    cond = tuple([*inp[:-1],condition_dimension])
-    for _ in range(config.coupling_blocks):
-        x = AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': inp, 'condition_dims': cond},subnet_fc,permute_soft=False)
-    return x
+    sample_dimension = tuple(input_dimension[1:])
+    cond = tuple([*sample_dimension[:-1],condition_dimension])
+
+    inp_place_holder = layers.Input(input_dimension[-1], batch_size=config.batch_size)
+    condition_place_holder = layers.Input(cond[-1], batch_size=config.batch_size)
+    # out = AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': inp, 'condition_dims': cond},self.subnet_fc,permute_soft=False)(inp_place_holder, condition_place_holder)
+    blocks = [AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': sample_dimension, 'condition_dims': cond},subnet_fc,permute_soft=False) for _ in range(config.coupling_blocks)]
+    z, log_jac_det = blocks[0](inp_place_holder, condition_place_holder)
+    for block in blocks[1:]:
+        z,log_jac_det = block(z, condition_place_holder)
+
+    # return blocks
+    decoder = keras.Model(inputs=[inp_place_holder, condition_place_holder],outputs=[z,log_jac_det])
+    return decoder
 
 # target: Load a single flow (an decoder)
 def load_decoder_arch(config: Config, input_dimension):
@@ -106,20 +123,3 @@ def load_decoder_arch(config: Config, input_dimension):
     else:
         raise NotImplementedError('Unsupported decoder architecture')
     return decoder
-
-class MainModel(keras.Model):
-    def __init__(self, ):
-        super().__init__()   
-
-    @property
-    def metrics(self):
-        pass
-
-    def compile(self, optimizer, loss_fn):
-        pass
-    
-    def train_step(self, input):
-        pass
-    
-    def eval_step(self, input):
-        pass

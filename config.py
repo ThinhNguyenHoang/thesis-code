@@ -22,10 +22,10 @@ class Config(argparse.Namespace):
     meta_epochs: int
     sub_epochs: int
     batch_size: int
+    N: int
     
     learning_rate: float
     dropout: float
-    epoch: int
     # model arch config
     # Saliency config
     saliency_detector: str
@@ -40,6 +40,7 @@ class Config(argparse.Namespace):
     cond_vec_len: int # dimension of positional encoding
     # Debug printing config
     verbose: bool # Should only print debugs if true
+    viz: bool # save test image (like saliency maps)
     debug: bool
 
     run_name: str 
@@ -72,6 +73,10 @@ def get_args():
                         help='number of sub epochs to train (default: 8)')
     parser.add_argument('-bs', '--batch-size', default=BATCH_SIZE, type=int, metavar='B',
                         help='train batch size (default: 12)')
+    
+    parser.add_argument('-N', '--N', default=240, type=int, metavar='N',
+                        help='fibere batches: default 240')
+
     parser.add_argument('-lr','--learning-rate', type=float, default=2e-4, metavar='LR',
                         help='learning rate (default: 2e-4)')
     # Model Architecture
