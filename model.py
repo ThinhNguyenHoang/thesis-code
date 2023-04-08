@@ -86,7 +86,7 @@ def flow_without_condition(config,input_dimension):
     
     return coder
 
-def flow_with_condition(config: Config, input_dimension):
+def flow_with_condition(config: Config, input_dimension, pool_layer_id=0):
     # condition_dimension = config.cond_vec_len
     # # pool_dimension = input_dimension[-1]
     # inp = tuple(input_dimension[:])
@@ -99,27 +99,26 @@ def flow_with_condition(config: Config, input_dimension):
     sample_dimension = tuple(input_dimension[1:])
     cond = tuple([*sample_dimension[:-1],condition_dimension])
 
-    inp_place_holder = layers.Input(input_dimension[-1], batch_size=config.batch_size)
-    condition_place_holder = layers.Input(cond[-1], batch_size=config.batch_size)
+    inp_place_holder = layers.Input(input_dimension[-1], name=f'scale_{pool_layer_id}_AIOB_feature_input')
+    condition_place_holder = layers.Input(cond[-1], name=f'scale_{pool_layer_id}_AIOB_conditional_input')
     # out = AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': inp, 'condition_dims': cond},self.subnet_fc,permute_soft=False)(inp_place_holder, condition_place_holder)
     blocks = [AllInOneBlock((input_dimension[-1],), [(cond[-1],)],{'feature_map_dims': sample_dimension, 'condition_dims': cond},subnet_fc,permute_soft=False) for _ in range(config.coupling_blocks)]
     z, log_jac_det = blocks[0](inp_place_holder, condition_place_holder)
     for block in blocks[1:]:
         z,log_jac_det = block(z, condition_place_holder)
 
-    # return blocks
     decoder = keras.Model(inputs=[inp_place_holder, condition_place_holder],outputs=[z,log_jac_det])
     return decoder
 
 # target: Load a single flow (an decoder)
-def load_decoder_arch(config: Config, input_dimension):
+def load_decoder_arch(config: Config, input_dimension, layer_id:int = 0):
     decoder_arch = config.decoder_arch
     if config.debug:
         debug.debug_print(f'load_decoder_arch::input_dimenstion={input_dimension}')
     if decoder_arch == 'freia-flow':
         decoder = flow_without_condition(config, input_dimension)
     elif decoder_arch == 'freia-cflow':
-        decoder = flow_with_condition(config, input_dimension)
+        decoder = flow_with_condition(config, input_dimension, layer_id)
     else:
         raise NotImplementedError('Unsupported decoder architecture')
     return decoder

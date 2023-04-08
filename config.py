@@ -4,8 +4,8 @@ import argparse
 INPUT_SIZE = 224 # 256x256
 BATCH_SIZE = 8
 
-COUPLING_BLOCKS = 4
-POOLING_LAYERS = 3
+COUPLING_BLOCKS = 1
+POOLING_LAYERS = 4
 class Config(argparse.Namespace):
     action_type: str
     verbose: bool

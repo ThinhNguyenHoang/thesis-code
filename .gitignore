@@ -7,3 +7,5 @@ __pycache__
 *.ipynb
 *.h5
 *.zip
+*.JPG
+/**/**/*.JPG

@@ -10,8 +10,9 @@ import sub_models.u2net.eval as u2net_eval
 import numpy as np
 import cv2
 from PIL import Image
-from tensorflow.python.framework.ops import disable_eager_execution 
+from tensorflow.python.framework.ops import disable_eager_execution
 from utils.loss import negative_log_likelihood
+import dataloader.plant_village_dataset as pvds
 disable_eager_execution()
 
 from main_model import MainModel
@@ -96,7 +97,7 @@ def build_general_arch(config):
     # Load encoder in evaluate mode and model building
     encoder, pool_layers, pool_dimensions = load_encoder_arch(config, pool_layers)
 
-    decoders =  [load_decoder_arch(config, pool_dimension) for pool_dimension in pool_dimensions]
+    decoders =  [load_decoder_arch(config, pool_dimension, layer_idx) for layer_idx,pool_dimension in enumerate(pool_dimensions)]
 
     saliency_detector = load_saliency_detector(config)
 
@@ -110,7 +111,7 @@ def build_general_arch(config):
     # input_img = tf.keras.utils.array_to_img(input_img)
     # saliency_map = u2net_eval.get_saliency_map(saliency_detector, img_copy)
 
-    for idx, feature_map in enumerate(feature_maps):
+    for pool_layer_idx, feature_map in enumerate(feature_maps):
         batch_size, height, width, depth = feature_map.shape
         # Interpolate - Resize the salience map to correct size
         # instance_aware = tf.reshape(saliency_map, [batch_size,height, width,-1])
@@ -119,7 +120,7 @@ def build_general_arch(config):
         # Ensure positional_encoding and instance_aware has the same shape
         # assert instance_aware.shape == positional_encoding.shape, 'encoding and feature map should have same shape'
         condition_vec = tf.math.multiply(instance_aware, positional_encoding) # BxHxD -- D = dimensions of encodings
-        decoder = decoders[idx]
+        decoder = decoders[pool_layer_idx]
         # FIBER PROCESSING 
         # feature_map: BxHxC ---- C: channels of pooling layers
         # condition_vec: BxHxD ------ D: dimension of positional encoding
@@ -142,7 +143,6 @@ def build_general_arch(config):
             perm_idx = tf.gather(perm, idx)
             feature_patch = tf.gather(features, perm_idx) # NxC ----- C:channels
             condition_patch = tf.gather(conditions, perm_idx) #  NxP ---------- P: pos_enc dimensitons
-            
             with tf.GradientTape() as tape:
                 if 'cflow' in config.decoder_arch: #!CHECK CONFIG VALUE
                     # inp = layers.Concatenate([feature_patch, condition_patch])
@@ -163,33 +163,19 @@ def build_general_arch(config):
     model.summary()
     return model
 
-def train_with_keras(config):
-    # # Get the saliency image: (black and white)
-    # model = build_general_arch(config)
-    # # optimizer
-    # optimizer = keras.optimizers.Adam(learning_rate=0.01)
-    
-    # # Dataset preparation
-    # if config.dataset == 'plant_village':
-    #     train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
-    #     # test_dataset = tfds.load('plant_village', split='test')
-    # else:
-    #     raise NotImplementedError("NOT SUPPORTED DATASET")
 
-    # # Network hyperparameters
-    # N = 256
-    # print(f'train datasete info: len={len(train_dataset)}')
-    # print(f'test datasete info: len={len(test_dataset)}')
-    pass
-
-def train_with_keras_subclass(config: Config, dataset=None, loader=None):
+def train_with_keras_subclass(config: Config, loader=None):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     img_size = config.input_size
-    # inp = keras.layers.Input(shape=(img_size,img_size,3), batch_size=config.batch_size)
+    img_sizes = (img_size, img_size, 3)
+    # inp = keras.layers.Input(shape=(img_sizes, 1, img_sizes), batch_size=config.batch_size)
+    # model = MainModel(config=config, subnet_fc=subnet_fc)(inp)
+    # model = keras.Model(inputs=inp, outputs=[decoder.output for decoder in model.decoders.layers[:2]])
+    # model.compile(optimizer=adam, loss_fn=negative_log_likelihood)
+
     model = MainModel(config=config, subnet_fc=subnet_fc)
-    # model = keras.Model(inputs=inp, outputs=[decoder.output for decoder in main.decoders.layers])
-    model.compile(optimizer=adam, loss_fn=negative_log_likelihood)
-    # model.build(input_shape=(img_size, img_size, 3), batch)
+    model.compile(optimizer=adam, loss_fn=negative_log_likelihood, loss=negative_log_likelihood)
+
     model.fit(loader, epochs=config.sub_epochs, callbacks=[])
     
 def train(config):
@@ -199,16 +185,10 @@ def train(config):
     # Load encoder in evaluate mode and model building
     # Dataset preparation
     if config.dataset == 'plant_village':
-        train_dataset = tfds.load('plant_village', split='train', shuffle_files=True)
-        # test_dataset = tfds.load('plant_village', split='test')
+        plant_gen = pvds.PlantVillageDataGenerator('datasets', 'PlantVillage','Pepper__bell___Bacterial_spot', config.batch_size,(224,224), 3, True, True)
     else:
         raise NotImplementedError("NOT SUPPORTED DATASET")
 
-    # Network hyperparameters
-    N = 256
-    print(f'train datasete info: len={train_dataset.cardinality()}')
-    # print(f'test datasete info: len={len(test_dataset)}')
-
-    # train_with_keras_subclass(config, loader=train_dataset)
+    train_with_keras_subclass(config, loader=plant_gen)
     
-    model = build_general_arch(config)
+    # model = build_general_arch(config)

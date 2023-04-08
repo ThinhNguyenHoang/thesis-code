@@ -11,8 +11,8 @@ def get_logp(C, z, logdet_J):
     logp = C * _GCONST_ - 0.5*tf.reduce_sum(z**2, 1) + logdet_J
     return logp
 
-def negative_log_likelihood(log_prob):
-    return -tf.math.log_sigmoid(log_prob)
+def negative_log_likelihood(y_true, y_pred):
+    return -tf.math.log_sigmoid(y_pred)
 
 def rescale(x):
     return (x - x.min()) / (x.max() - x.min())
