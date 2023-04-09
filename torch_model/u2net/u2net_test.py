@@ -51,6 +51,52 @@ def save_output(image_name,pred,d_dir):
 
     imo.save(d_dir+imidx+'.png')
 
+
+# model_path: should be the path to the u2net root folder
+def load_u2net_eval(model_dir:str):
+    model_name = 'u2net'
+    model_dir = os.path.join(model_dir, 'saved_models', model_name, model_name + '.pth')
+        # --------- 3. model define ---------
+    if(model_name=='u2net'):
+        print("...load U2NET---173.6 MB")
+        net = U2NET(3,1)
+    elif(model_name=='u2netp'):
+        print("...load U2NEP---4.7 MB")
+        net = U2NETP(3,1)
+
+    if torch.cuda.is_available():
+        net.load_state_dict(torch.load(model_dir))
+        net.cuda()
+    else:
+        net.load_state_dict(torch.load(model_dir, map_location='cpu'))
+    net.eval()
+    return net
+
+# img: should be of shape (B, 3, H, W) or (3, H, W)
+# return: saliency map of shape (B ,1, H, W)
+# can either pass in a batch of iamges or a single image of dim3
+def eval_with_u2net(net, img):
+    inputs_test = img
+    inputs_test = inputs_test.type(torch.FloatTensor)
+    
+    if inputs_test.dim() == 3:
+        # (3, H, W) => (1, 3, H, W)
+        inputs_test = torch.unsqueeze(inputs_test, 0)
+    
+    if torch.cuda.is_available():
+        inputs_test = Variable(inputs_test.cuda())
+    else:
+        inputs_test = Variable(inputs_test)
+
+    d1,d2,d3,d4,d5,d6,d7= net(inputs_test)
+
+    # normalization
+    pred = d1[:,0,:,:]
+    pred = normPRED(pred)
+
+    del d1,d2,d3,d4,d5,d6,d7
+    return pred
+
 def main():
 
     # --------- 1. get image path and name ---------

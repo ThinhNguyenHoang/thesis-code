@@ -6,10 +6,11 @@ from sklearn.metrics import roc_auc_score, auc, precision_recall_curve
 from skimage.measure import label, regionprops
 from tqdm import tqdm
 from visualize import *
-from model import load_decoder_arch, load_encoder_arch, positionalencoding2d, activation
+from model import load_decoder_arch, load_encoder_arch, positionalencoding2d, activation, load_saliency_detector_arch, get_saliency_map
 from utils import *
 from custom_datasets import *
 from custom_models import *
+from torchvision import transforms
 
 OUT_DIR = './viz/'
 
@@ -18,7 +19,7 @@ theta = torch.nn.Sigmoid()
 log_theta = torch.nn.LogSigmoid()
 
 
-def train_meta_epoch(c, epoch, loader, encoder, decoders, optimizer, pool_layers, N):
+def train_meta_epoch(c, epoch, loader,saliency_detector, encoder, decoders, optimizer, pool_layers, N):
     P = c.condition_vec
     L = c.pool_layers
     decoders = [decoder.train() for decoder in decoders]
@@ -39,26 +40,21 @@ def train_meta_epoch(c, epoch, loader, encoder, decoders, optimizer, pool_layers
                 image, _, _ = next(iterator)
             # encoder prediction
             image = image.to(c.device)  # single scale
+            saliency_map = get_saliency_map(saliency_detector, image) # Bx1xHxW
             with torch.no_grad():
                 _ = encoder(image)
             # train decoder
             e_list = list()
             c_list = list()
             for l, layer in enumerate(pool_layers):
-                if 'vit' in c.enc_arch:
-                    # NOTATION: e is encoded feature map at pooling layers
-                    e = activation[layer].transpose(1, 2)[...,1:]
-                    e_hw = int(np.sqrt(e.size(2)))
-                    e = e.reshape(-1, e.size(1), e_hw, e_hw)  # BxCxHxW
-                else:
-                    e = activation[layer].detach()  # BxCxHxW
+                e = activation[layer].detach()  # BxCxHxW
                 #
                 B, C, H, W = e.size()
                 S = H*W
-                E = B*S    
+                E = B*S
                 #
+                saliency_resized = transforms.Resize()
                 p = positionalencoding2d(P, H, W).to(c.device).unsqueeze(0).repeat(B, 1, 1, 1) # BxPxHxW
-                
                 # positional --- condition
                 # BxPxHxW -----> BxPx(HW)---------> Bx(HW)xP ----> BHWxP
                 c_r = p.reshape(B, P, S).transpose(1, 2).reshape(E, P)  # BHWxP
@@ -270,6 +266,7 @@ def train(c):
     encoder = encoder.to(c.device).eval()
     #print(encoder)
     # NF decoder
+    saliency_detector = load_saliency_detector_arch(c)
     decoders = [load_decoder_arch(c, pool_dim) for pool_dim in pool_dims]
     decoders = [decoder.to(c.device) for decoder in decoders]
     params = list(decoders[0].parameters())
@@ -305,7 +302,7 @@ def train(c):
             load_weights(encoder, decoders, c.checkpoint)
         elif c.action_type == 'norm-train':
             print('Train meta epoch: {}'.format(epoch))
-            train_meta_epoch(c, epoch, train_loader, encoder, decoders, optimizer, pool_layers, N)
+            train_meta_epoch(c, epoch,saliency_detector, train_loader, encoder, decoders, optimizer, pool_layers, N)
         else:
             raise NotImplementedError('{} is not supported action type!'.format(c.action_type))
         

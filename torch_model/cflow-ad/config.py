@@ -12,6 +12,8 @@ def get_args():
                         help='file with saved checkpoint')
     parser.add_argument('-cl', '--class-name', default='none', type=str, metavar='C',
                         help='class name for MVTec/STC (default: none)')
+    parser.add_argument('--obj_det', type=float, default=2e-4, metavar='A',
+                        help='saliency detector (default: u2net)')
     parser.add_argument('-enc', '--enc-arch', default='wide_resnet50_2', type=str, metavar='A',
                         help='feature extractor: wide_resnet50_2/resnet18/mobilenet_v3_large (default: wide_resnet50_2)')
     parser.add_argument('-dec', '--dec-arch', default='freia-cflow', type=str, metavar='A',

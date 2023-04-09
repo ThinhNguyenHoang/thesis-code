@@ -6,7 +6,9 @@ from custom_models import *
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
 import timm
-
+import os
+from torchvision import transforms
+from ..u2net import u2net_test
 
 def positionalencoding2d(D, H, W):
     """
@@ -28,8 +30,15 @@ def positionalencoding2d(D, H, W):
     P[D::2,  :, :]  = torch.sin(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, W)
     P[D+1::2,:, :]  = torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, W)
     return P
-
-
+# ================== SALIENCY DETECTOR =========================
+def load_saliency_detector_arch(c):
+    u2net_dir = os.path.join(os.getcwd(), 'u2net')
+    return u2net_test.load_u2net_eval(u2net_dir)
+def get_saliency_map(detector, input_img):
+    with torch.no_grad:
+        pred = u2net_test.eval_with_u2net(detector, input_img)
+        return pred
+# ================== DECODER ======================
 def subnet_fc(dims_in, dims_out):
     return nn.Sequential(nn.Linear(dims_in, 2*dims_in), nn.ReLU(), nn.Linear(2*dims_in, dims_out))
 
@@ -63,7 +72,7 @@ def load_decoder_arch(c, dim_in):
     #print(decoder)
     return decoder
 
-
+# ==================== ENCODER ========================
 activation = {}
 def get_activation(name):
     def hook(model, input, output):
@@ -111,26 +120,6 @@ def load_encoder_arch(c, L):
                 pool_dims.append(encoder.layer4[-1].conv3.out_channels)
             else:
                 pool_dims.append(encoder.layer4[-1].conv2.out_channels)
-            pool_cnt = pool_cnt + 1
-    elif 'vit' in c.enc_arch:
-        if  c.enc_arch == 'vit_base_patch16_224':
-            encoder = timm.create_model('vit_base_patch16_224', pretrained=True)
-        elif  c.enc_arch == 'vit_base_patch16_384':
-            encoder = timm.create_model('vit_base_patch16_384', pretrained=True)
-        else:
-            raise NotImplementedError('{} is not supported architecture!'.format(c.enc_arch))
-        #
-        if L >= 3:
-            encoder.blocks[10].register_forward_hook(get_activation(pool_layers[pool_cnt]))
-            pool_dims.append(encoder.blocks[6].mlp.fc2.out_features)
-            pool_cnt = pool_cnt + 1
-        if L >= 2:
-            encoder.blocks[2].register_forward_hook(get_activation(pool_layers[pool_cnt]))
-            pool_dims.append(encoder.blocks[6].mlp.fc2.out_features)
-            pool_cnt = pool_cnt + 1
-        if L >= 1:
-            encoder.blocks[6].register_forward_hook(get_activation(pool_layers[pool_cnt]))
-            pool_dims.append(encoder.blocks[6].mlp.fc2.out_features)
             pool_cnt = pool_cnt + 1
     elif 'efficient' in c.enc_arch:
         if 'b5' in c.enc_arch:
