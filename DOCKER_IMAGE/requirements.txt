@@ -1,2 +1,6 @@
 opencv-python-headless==4.7.0.68
 wget==3.2
+FrEIA
+tqdm
+av
+timm

@@ -4,4 +4,5 @@ CMD jupyter-notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
 
 # Start the local jupyter for testing with command
 # docker run --gpus all -p 8888:8888 -p 6006:6006 -v $(pwd):/dmc jupyter_local_testing:local
-# docker run  -p 8888:8888 -p 6006:6006 -v $(pwd):/dmc jupyter_local_testing:local
+# docker run --gpus all -p 8888:8888 -p 6006:6006 -v $(pwd):/dmc jupyter_local_testing:local
+# docker run --gpus all -p 8887:8888 -p 6007:6006 -v $(pwd):/dmc torch_model_dev
